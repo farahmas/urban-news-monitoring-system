@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kocaeli Haber Haritası</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+  #panel { width: 300px; min-width: 300px; background: #1a1f2e; color: #e0e0e0; display: flex; flex-direction: column; z-index: 1000; box-shadow: 2px 0 10px rgba(0,0,0,0.4); }
+  #panel-header { background: #2d3561; padding: 16px; text-align: center; border-bottom: 1px solid #3d4580; }
+  #panel-header h1 { font-size: 16px; color: #fff; margin-bottom: 4px; }
+  #panel-header p { font-size: 11px; color: #8899bb; }
+  #panel-body { padding: 14px; flex: 1; overflow-y: auto; }
+  .filtre-grup { margin-bottom: 14px; }
+  .filtre-grup label { display: block; font-size: 11px; color: #8899bb; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .filtre-grup select, .filtre-grup input { width: 100%; padding: 7px 10px; background: #252b40; border: 1px solid #3d4580; border-radius: 6px; color: #e0e0e0; font-size: 13px; }
+  .filtre-grup select:focus, .filtre-grup input:focus { outline: none; border-color: #5566cc; }
+  #btn-filtrele { width: 100%; padding: 9px; background: #4a56c8; border: none; border-radius: 6px; color: #fff; font-size: 13px; cursor: pointer; margin-bottom: 14px; font-weight: 600; }
+  #btn-filtrele:hover { background: #5566dd; }
+  #btn-scrape { width: 100%; padding: 9px; background: #2d6a4f; border: none; border-radius: 6px; color: #fff; font-size: 13px; cursor: pointer; margin-bottom: 14px; }
+  #btn-scrape:hover { background: #3d7a5f; }
+  #btn-scrape:disabled { background: #555; cursor: not-allowed; }
+  #istatistikler { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 14px; }
+  .stat-kart { background: #252b40; border-radius: 6px; padding: 8px; text-align: center; border-left: 3px solid #555; }
+  .stat-kart .sayi { font-size: 20px; font-weight: 700; }
+  .stat-kart .etiket { font-size: 10px; color: #8899bb; margin-top: 2px; }
+  .legand-baslik { font-size: 11px; color: #8899bb; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .legand-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+  .legand-renk { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+  #son-haberler { margin-top: 14px; }
+  .son-haberler-baslik { font-size: 11px; color: #8899bb; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .haber-kart { background: #252b40; border-radius: 6px; padding: 9px; margin-bottom: 6px; border-left: 3px solid #555; cursor: pointer; transition: background 0.2s; }
+  .haber-kart:hover { background: #2e3550; }
+  .haber-kart .haber-baslik { font-size: 12px; color: #ddd; line-height: 1.4; margin-bottom: 4px; }
+  .haber-kart .haber-meta { font-size: 10px; color: #8899bb; }
+  #harita { flex: 1; }
+  .popup-icerik { min-width: 220px; max-width: 280px; font-family: 'Segoe UI', sans-serif; }
+  .popup-tur { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; margin-bottom: 6px; color: #fff; }
+  .popup-baslik { font-size: 14px; font-weight: 600; margin-bottom: 6px; line-height: 1.4; color: #222; }
+  .popup-meta { font-size: 12px; color: #666; margin-bottom: 4px; }
+  .popup-kaynaklar { font-size: 11px; color: #888; margin-bottom: 8px; }
+  .popup-btn { display: inline-block; padding: 6px 14px; background: #4a56c8; color: #fff; border-radius: 5px; text-decoration: none; font-size: 12px; font-weight: 600; }
+  .popup-btn:hover { background: #5566dd; }
+  .popup-ek-link { display: block; font-size: 11px; color: #4a56c8; text-decoration: none; margin-top: 4px; }
+  .popup-ek-link:hover { text-decoration: underline; }
+  #yukleniyor { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.7); color: #fff; padding: 12px 20px; border-radius: 8px; z-index: 9999; display: none; font-size: 13px; }
+  .gm-marker { width: 36px; height: 36px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; transition: transform 0.15s; }
+  .gm-marker:hover { transform: scale(1.15); }
+</style>
+</head>
+<body>
+<div id="panel">
+  <div id="panel-header">
+    <h1>🗺️ Kocaeli Haber Haritası</h1>
+    <p id="haber-sayisi">Yükleniyor...</p>
+  </div>
+  <div id="panel-body">
+    <div class="filtre-grup"><label>Tarih Aralığı</label><input type="date" id="tarih-baslangic"></div>
+    <div class="filtre-grup"><input type="date" id="tarih-bitis"></div>
+    <div class="filtre-grup">
+      <label>Olay Türü</label>
+      <select id="tur-filtre">
+        <option value="Tümü">Tümü</option>
+        <option value="Trafik Kazası">🚗 Trafik Kazası</option>
+        <option value="Yangın">🔥 Yangın</option>
+        <option value="Elektrik Kesintisi">⚡ Elektrik Kesintisi</option>
+        <option value="Hırsızlık">🔒 Hırsızlık</option>
+        <option value="Kültürel Etkinlikler">🎭 Kültürel Etkinlikler</option>
+      </select>
+    </div>
+    <div class="filtre-grup"><label>İlçe</label><select id="ilce-filtre"><option value="Tümü">Tümü</option></select></div>
+    <button id="btn-filtrele" onclick="filtreUygula()">🔍 Filtrele</button>
+    <button id="btn-scrape" onclick="scrapeBaslat()">🔄 Haberleri Güncelle</button>
+    <div id="istatistikler">
+      <div class="stat-kart" style="border-color:#e74c3c"><div class="sayi" id="stat-trafik">-</div><div class="etiket">Trafik</div></div>
+      <div class="stat-kart" style="border-color:#e67e22"><div class="sayi" id="stat-yangin">-</div><div class="etiket">Yangın</div></div>
+      <div class="stat-kart" style="border-color:#f1c40f"><div class="sayi" id="stat-elektrik">-</div><div class="etiket">Elektrik</div></div>
+      <div class="stat-kart" style="border-color:#9b59b6"><div class="sayi" id="stat-hirsizlik">-</div><div class="etiket">Hırsızlık</div></div>
+      <div class="stat-kart" style="border-color:#2ecc71; grid-column: span 2;"><div class="sayi" id="stat-kulturel">-</div><div class="etiket">Kültürel Etkinlikler</div></div>
+    </div>
+    <div class="legand-baslik">Renk Kodları</div>
+    <div class="legand-item"><div class="legand-renk" style="background:#e74c3c"></div> Trafik Kazası</div>
+    <div class="legand-item"><div class="legand-renk" style="background:#e67e22"></div> Yangın</div>
+    <div class="legand-item"><div class="legand-renk" style="background:#f1c40f"></div> Elektrik Kesintisi</div>
+    <div class="legand-item"><div class="legand-renk" style="background:#9b59b6"></div> Hırsızlık</div>
+    <div class="legand-item"><div class="legand-renk" style="background:#2ecc71"></div> Kültürel Etkinlikler</div>
+    <div id="son-haberler"><div class="son-haberler-baslik">Son Haberler</div><div id="haber-listesi"></div></div>
+  </div>
+</div>
+<div id="harita"></div>
+<div id="yukleniyor">⏳ Yükleniyor...</div>
+<script>
+const TUR_RENKLERI={'Trafik Kazası':'#e74c3c','Yangın':'#e67e22','Elektrik Kesintisi':'#f1c40f','Hırsızlık':'#9b59b6','Kültürel Etkinlikler':'#2ecc71'};
+const TUR_EMOJILERI={'Trafik Kazası':'🚗','Yangın':'🔥','Elektrik Kesintisi':'⚡','Hırsızlık':'🔒','Kültürel Etkinlikler':'🎭'};
+let harita,markerlar=[],aktifInfoWindow=null,tumHaberler=[];
+
+function initMap(){
+  harita=new google.maps.Map(document.getElementById('harita'),{center:{lat:40.7654,lng:29.9408},zoom:11,mapId:'kocaeli_haber_map',mapTypeControl:true,streetViewControl:false,fullscreenControl:true});
+  haberleriYukle();
+  ilceleriYukle();
+  const bugun=new Date(),ucGunOnce=new Date(bugun);ucGunOnce.setDate(bugun.getDate()-3);
+  document.getElementById('tarih-bitis').value=bugun.toISOString().split('T')[0];
+  document.getElementById('tarih-baslangic').value=ucGunOnce.toISOString().split('T')[0];
+}
+
+function markerEkle(haber){
+  const renk=TUR_RENKLERI[haber.haber_turu]||'#95a5a6';
+  const emoji=TUR_EMOJILERI[haber.haber_turu]||'📌';
+  const markerEl=document.createElement('div');markerEl.className='gm-marker';markerEl.style.background=renk;markerEl.innerHTML=emoji;
+  const offset=0.003;
+  const position={lat:haber.enlem+(Math.random()-0.5)*offset,lng:haber.boylam+(Math.random()-0.5)*offset};
+  const marker=new google.maps.marker.AdvancedMarkerElement({position:position,map:harita,content:markerEl,title:haber.haber_basligi});
+  const tarih=haber.yayin_tarihi?haber.yayin_tarihi.substring(0,10):'Bilinmiyor';
+  
+  const tumKaynaklar = haber.kaynak_listesi || [haber.haber_sitesi];
+  const tumLinkler = [haber.haber_linki, ...(haber.ek_linkler || [])];
+
+  
+  let butonlarHTML = '';
+  tumKaynaklar.forEach((kaynak, idx) => {
+    const link = tumLinkler[idx] || tumLinkler[0];
+    if(idx === 0) {
+      butonlarHTML += `<a href="${link}" target="_blank" class="popup-btn" style="margin-bottom:4px;display:block;text-align:center;">Habere Git → ${kaynak}</a>`;
+    } else {
+      butonlarHTML += `<a href="${link}" target="_blank" class="popup-btn" style="margin-bottom:4px;display:block;text-align:center;background:#6c757d;">Habere Git → ${kaynak}</a>`;
+    }
+  });
+
+  const kaynakMetni = tumKaynaklar.join(', ');
+
+  const infoWindow=new google.maps.InfoWindow({
+    content:`<div class="popup-icerik"><span class="popup-tur" style="background:${renk}">${haber.haber_turu}</span><div class="popup-baslik">${haber.haber_basligi}</div><div class="popup-meta">📅 ${tarih}</div><div class="popup-meta">📍 ${haber.konum_metni||''}</div><div class="popup-kaynaklar">📰 Kaynaklar: ${kaynakMetni}</div>${butonlarHTML}</div>`,
+    maxWidth:320
+  });
+  marker.addListener('gmp-click',()=>{if(aktifInfoWindow)aktifInfoWindow.close();infoWindow.open(harita,marker);aktifInfoWindow=infoWindow;});
+  return marker;
+}
+
+function istatistikleriHesapla(haberler){
+  const sayac = {
+    "Trafik Kazası": 0,
+    "Yangın": 0,
+    "Elektrik Kesintisi": 0,
+    "Hırsızlık": 0,
+    "Kültürel Etkinlikler": 0
+  };
+
+  haberler.forEach(h => {
+    if (sayac[h.haber_turu] !== undefined) {
+      sayac[h.haber_turu]++;
+    }
+  });
+
+  document.getElementById('stat-trafik').textContent = sayac["Trafik Kazası"];
+  document.getElementById('stat-yangin').textContent = sayac["Yangın"];
+  document.getElementById('stat-elektrik').textContent = sayac["Elektrik Kesintisi"];
+  document.getElementById('stat-hirsizlik').textContent = sayac["Hırsızlık"];
+  document.getElementById('stat-kulturel').textContent = sayac["Kültürel Etkinlikler"];
+}
+
+function haberleriGoster(haberler){
+  markerlar.forEach(m=>{m.map=null;});markerlar=[];
+  haberler.forEach(haber=>{if(!haber.enlem||!haber.boylam)return;markerlar.push(markerEkle(haber));});
+  document.getElementById('haber-sayisi').textContent=`${haberler.length} haber gösteriliyor`;
+  sonHaberleriGoster(haberler.slice(0,8));
+  istatistikleriHesapla(haberler);
+}
+
+function sonHaberleriGoster(haberler){
+  const liste=document.getElementById('haber-listesi');liste.innerHTML='';
+  haberler.forEach(haber=>{
+    const renk=TUR_RENKLERI[haber.haber_turu]||'#95a5a6';
+    const emoji=TUR_EMOJILERI[haber.haber_turu]||'📌';
+    const tarih=haber.yayin_tarihi?haber.yayin_tarihi.substring(0,10):'';
+    const konum=haber.ilce||haber.konum_metni||'';
+    const div=document.createElement('div');div.className='haber-kart';div.style.borderLeftColor=renk;
+    div.innerHTML=`<div class="haber-baslik">${emoji} ${haber.haber_basligi.substring(0,60)}...</div><div class="haber-meta">${konum} · ${tarih}</div>`;
+    div.onclick=()=>window.open(haber.haber_linki,'_blank');liste.appendChild(div);
+  });
+}
+
+async function haberleriYukle(params={}){
+  document.getElementById('yukleniyor').style.display='block';
+  try{const sorgu=new URLSearchParams(params).toString();const cevap=await fetch(`/api/haberler?${sorgu}`);const veri=await cevap.json();tumHaberler=veri.haberler;haberleriGoster(tumHaberler);}
+  catch(e){alert('Haberler yüklenirken hata: '+e.message);}
+  finally{document.getElementById('yukleniyor').style.display='none';}
+}
+
+async function istatistikleriYukle(){
+  try{const cevap=await fetch('/api/istatistik');const veri=await cevap.json();
+  document.getElementById('stat-trafik').textContent=veri.trafik||0;
+  document.getElementById('stat-yangin').textContent=veri.yangin||0;
+  document.getElementById('stat-elektrik').textContent=veri.elektrik||0;
+  document.getElementById('stat-hirsizlik').textContent=veri.hirsizlik||0;
+  document.getElementById('stat-kulturel').textContent=veri.kulturel||0;}catch(e){console.error(e);}
+}
+
+async function ilceleriYukle(){
+  try{const cevap=await fetch('/api/ilceler');const ilceler=await cevap.json();const select=document.getElementById('ilce-filtre');
+  ilceler.forEach(ilce=>{const opt=document.createElement('option');opt.value=ilce;opt.textContent=ilce;select.appendChild(opt);});}catch(e){console.error(e);}
+}
+
+function filtreUygula(){
+  const params={};const tur=document.getElementById('tur-filtre').value;const ilce=document.getElementById('ilce-filtre').value;
+  const baslangic=document.getElementById('tarih-baslangic').value;const bitis=document.getElementById('tarih-bitis').value;
+  if(tur!=='Tümü')params.tur=tur;if(ilce!=='Tümü')params.ilce=ilce;
+  if(baslangic)params.baslangic=baslangic;if(bitis)params.bitis=bitis;
+  haberleriYukle(params);
+}
+
+async function scrapeBaslat(){
+  const btn=document.getElementById('btn-scrape');btn.disabled=true;btn.textContent='⏳ Güncelleniyor... (biraz sürebilir)';
+  try{const cevap=await fetch('/api/scrape',{method:'POST'});const veri=await cevap.json();alert(veri.mesaj);haberleriYukle();}
+  catch(e){alert('Hata: '+e.message);}
+  finally{btn.disabled=false;btn.textContent='🔄 Haberleri Güncelle';}
+}
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_key }}&libraries=marker&callback=initMap&loading=async" async defer></script>
+</body>
+</html>
+
+
